@@ -1,0 +1,568 @@
+---
+title:  'Din?mica hidroclim?tica e o fen?meno ENOS na bacia hidrogr?fica do Rio Piquiri - PR'
+subtitle:
+author:
+- Lane
+- Raul
+- Fe
+date: "`r format(Sys.time(), '%d %B %Y')`"
+tags: [nothing, nothingness]
+output: beamer_presentation
+---
+
+```{r setup, include=FALSE}
+
+library(dplyr)
+library(ggplot2)
+library(forecast)
+library(ggfortify)
+library(lubridate)
+library(tidyr)
+
+knitr::opts_chunk$set(echo = FALSE,
+                      warning = F,
+                      error = F)
+
+completo <- readRDS('dados/completo.rds')
+
+
+anos <- 1950:2010
+meses <- c('Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez')
+
+vazao_santa_maria <- completo %>% 
+  filter(Posto.Fluv == 'Santa Maria',
+         pluviometro != c('3','5','6','34','36')) %>% 
+  group_by(data, Evento) %>% 
+  summarise_each(funs(mean(., na.rm = T)), IOS, Vazao, Precipitacao) %>% 
+  mutate(Mes = factor(meses[month(data)], meses))
+
+
+```
+
+## Introdu??o
+
+- O *El Ni?o* ? um fen?meno clim?tico caracterizado por um aquecimento acima do normal das ?guas do oceano pac?fico equatorial.
+
+- Define-se *La Ni?a* de maneira an?loga.
+
+- Consequ?ncias clim?ticas em todo o planeta:
+
+    - Na costa oeste da Am?rica do Sul, observa-se mudan?a na m?dia de temperatura e chuvas.
+
+    - No Brasil, observa-se mudan?a na m?dia de chuvas.
+
+## Introdu??o
+
+![](figuras/comparacao_temperatura_el_nino.png)
+
+## IOS (?ndice de Oscila??o Sul)
+
+- Existem muitas maneiras de caracterizar a ocorr?ncia de *El Ni?o*/*La Ni?a*.
+
+- IOS: ?ndice **mensal** que mede a diferen?a de press?o atmosf?rica entre as esta??es de Tahiti e Darwin.
+
+- Varia entre -35 e 35.
+
+- Valores abaixo de -7 indicam a presen?a de *El Ni?o*.
+
+- Valores acima de 7 indicam a presen?a de *La Ni?a*.
+
+## IOS
+
+```{r, echo = F}
+vazao_santa_maria %>% 
+ungroup() %>% 
+mutate(decenio = cut(year(data), 4, labels = F)) %>% 
+ggplot(aes(x = data, y = IOS, color = Evento))+
+    geom_line(color = 'black', linetype = 1)+
+  geom_point(size = 2.1)+
+  facet_wrap(~decenio, scales = 'free_x')+
+  theme_bw() +
+  geom_hline(yintercept = 7) +
+  geom_hline(yintercept = -7) +
+  theme(legend.position = 'bottom',
+      strip.background = element_blank(),
+      strip.text.x = element_blank())
+```
+
+## IOS
+
+### Observa??es
+
+- Meses com IOS fora de [-7,7] podem ocorrer fora de grandes eventos clim?ticos.
+
+### Per?odos com eventos mais intensos
+
+- *El Ni?o* forte: 1982-1983, 1991-1994, 1997-1998, 2015-HOJE!
+
+- *La Ni?a* forte: 1988-1989, 2007-2008, 2010. 
+
+## Objetivo do estudo | Geral
+
+- Caracterizar o impacto do El Ni?o/La Ni?a no Clima da bacia do Piquiri.
+
+![piquiri](figuras/piquiri_no_parana.jpg)
+
+
+## Bacia do Piquiri
+
+![elnino](figuras/bacia_do_piquiri.jpg)    
+
+## Vari?veis observadas
+
+### Precipita??o
+    
+- Quantidade de chuva ($mm$).
+- Medida em 41 pluviom?tros eletr?nicos.
+- Dados **mensais**.
+
+### Vaz?o
+
+- Rapidez com a qual o volume de ?gua escoa ($m^3$/s).
+- Medida em 3 esta??es fluviom?tricas.
+- Dados **mensais**.
+        
+## Objetivo do estudo | Particular
+
+### Caracterizar a associa??o entre: 
+
+  - IOS e Vaz?o 
+
+  - IOS e Precipita??o 
+
+  - Vaz?o e Precipita??o 
+
+## Vaz?o
+
+```{r, echo = F, warning=FALSE}
+
+completo %>% 
+  group_by(Posto.Fluv, data) %>% 
+  summarise(
+    Vazao = mean(Vazao, na.rm = T)
+  ) %>%
+  #mutate(decenio = cut(year(data), 4, labels = F)) %>% 
+  ggplot(aes(x = data, y = Vazao, color = Posto.Fluv))+
+  geom_line()+
+  #geom_point()+
+  facet_wrap(~Posto.Fluv, scales = 'free', ncol = 1)+
+  theme_bw() +
+  ylab('Vaz?o (m^3/s)')+
+  xlab('Data')+
+  theme(legend.position = 'bottom',
+        strip.background = element_blank(),
+        strip.text.x = element_blank())
+
+```
+
+## Vaz?o
+
+### Observa?oes
+
+- Os picos das tr?s s?ries coincidem.
+
+- A similaridade das s?ries sugere que as conclus?es ser?o as mesmas nos tr?s postos.
+
+- Nesta apresenta??o, adotaremos como refer?ncia Santa Maria e seus pluviometros.
+
+##Vaz?o | Sazonalidade
+Boxplots de vaz?o mensal
+
+```{r, echo = F}
+
+vazao_santa_maria %>% 
+  group_by(Mes) %>% 
+  ggplot(aes(x = Mes, y = Vazao)) +
+  geom_boxplot() +
+  theme_bw(18) +
+  ylab('Vaz?o (m^3/s)')
+
+```
+
+##Vaz?o | Sazonalidade
+Fun??o de autocorrela??o da vaz?o
+
+```{r, echo = F}
+
+vazao_santa_maria %>% 
+  with(acf(ts(Vazao, frequency = 12), plot = F)) %>% 
+  ggfortify:::autoplot.acf() +
+  theme_bw(18) +
+  geom_hline(yintercept = 0) +
+  ylab('Auto-correla??o')+
+  xlab('Defasagem')
+  
+``` 
+
+## Precipita??o
+
+```{r, echo = F}
+
+vazao_santa_maria %>% 
+  ungroup() %>% 
+  mutate(decenio = cut(year(data), 4, labels = F)) %>% 
+  ggplot(aes(x = data, y = Precipitacao))+
+  geom_line(color = 'royalblue')+
+  facet_wrap(~decenio, scales = 'free_x', ncol = 2)+
+  theme_bw(18) +
+  ylab('Precipita??o (mm)')+
+  xlab('Data')+
+  theme(legend.position = 'bottom',
+      strip.background = element_blank(),
+      strip.text.x = element_blank())
+
+``` 
+
+## Precipita??o | Sazonalidade
+Boxplots de precipita??o mensal 
+
+```{r, echo = F}
+
+vazao_santa_maria %>%
+  ungroup() %>% 
+  group_by(Mes) %>% 
+  # group_by(Mes, pluviometro) %>% 
+  # summarise(
+  #   Prep_max = quantile(Precipitacao, 0.9, na.rm = T),
+  #   Prep_min = quantile(Precipitacao, 0.1, na.rm = T),
+  #   Precipitacao = mean(Precipitacao, na.rm = T)) %>% 
+  ggplot(aes(x = Mes, y = Precipitacao)) +
+  geom_boxplot() +
+  #geom_point() +
+  #geom_ribbon(alpha = 0.15, color = 'black', linetype = 2)+
+  #facet_wrap(~pluviometro, ncol = 2) +
+  theme_bw(18) +
+  ylab('Precipita??o (mm)')+
+  xlab('Mes')+
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+##Vaz?o | Sazonalidade
+Fun??o de autocorrela??o da precipita??o
+
+```{r, echo = F}
+
+vazao_santa_maria %>% 
+  with(acf(ts(Precipitacao, frequency = 12), plot = F)) %>% 
+  ggfortify:::autoplot.acf() +
+  theme_bw(18) +
+  geom_hline(yintercept = 0) +
+  ylab('Auto-correla??o')+
+  xlab('Defasagem')
+  
+``` 
+
+## Precipita??o
+
+### Observa??es
+
+- Comportamento irregular das s?ries.
+
+- Maiores n?veis no ver?o e na primavera.
+
+- Queda no inverno e outono.
+
+- Alta variabilidade, em particular em maio.
+
+### Sazonalidade
+
+- Sazonalidade presente de forma significativa, n?o muito expressiva.
+
+## Vaz?o e Precipita??o | Gr?fico de dispers?o
+
+```{r, echo = F, warning=FALSE}
+
+dados_fit <- vazao_santa_maria %>% 
+  ungroup() %>% 
+  mutate(P = Precipitacao,
+         P2 = Precipitacao^2) %>% 
+  select(Vazao, P, P2)
+
+modelos <- list(
+  'Linear' = lm(Vazao ~ P, data = dados_fit),
+  `Quadr?tico` = lm(Vazao ~ P2 + P, data = dados_fit)
+  )
+
+quadrado <- data_frame(tipo = c('Linear',
+                                'Quadr?tico')) %>%
+  group_by(tipo) %>% 
+  do(d = dados_fit) %>% 
+  do(
+    Precipitacao = .$d$P,
+    Vazao = predict(modelos[[.$tipo]], newdata = .$d)
+    ) %>% 
+  ungroup() %>% 
+  mutate(Modelo = c('Linear','Quadr?tico')) %>% 
+  unnest(Precipitacao, Vazao)
+  
+vazao_santa_maria %>% 
+  ggplot(aes(x = Precipitacao, y = Vazao, color = IOS)) +
+  geom_point() +
+  geom_line(data = quadrado, aes(linetype = Modelo), color = 'black') +
+  theme_bw() +
+  xlab('Precipita??o (mm)') +
+  ylab('Vaz?o (mm^3/s)') +
+  scale_color_gradient2(low = 'red', high = 'green', mid = 'gray')
+
+```
+
+## Vaz?o e Precipita??o | Gr?fico de dispers?o entre Vaz?o e Precipita??o defasada em um m?s
+
+```{r, echo = F, warning=FALSE}
+
+dados_fit <- vazao_santa_maria %>% 
+  ungroup() %>% 
+  mutate(P = lag(Precipitacao),
+         P2 = lag(Precipitacao)^2) %>% 
+  select(Vazao, P, P2)
+
+modelos <- list(
+  'Linear' = lm(Vazao ~ P, data = dados_fit),
+  `Quadr?tico` = lm(Vazao ~ P2 + P, data = dados_fit)
+  )
+
+quadrado <- data_frame(tipo = c('Linear',
+                                'Quadr?tico')) %>%
+  group_by(tipo) %>% 
+  do(d = dados_fit) %>% 
+  do(
+    Precipitacao = .$d$P,
+    Vazao = predict(modelos[[.$tipo]], newdata = .$d)
+    ) %>% 
+  ungroup() %>% 
+  mutate(Modelo = c('Linear','Quadr?tico')) %>% 
+  unnest(Precipitacao, Vazao)
+  
+vazao_santa_maria %>% 
+  ungroup() %>% 
+  mutate(Precipitacao = lag(Precipitacao)) %>% 
+  ggplot(aes(x = Precipitacao, y = Vazao, color = IOS)) +
+  geom_point() +
+  geom_line(data = quadrado, 
+            aes(linetype = Modelo),
+            color = 'black') +
+  theme_bw() +
+  xlab('Precipita??o defasada (mm)') +
+  ylab('Vaz?o (m^3/s)') +
+  scale_color_gradient2(low = 'red', high = 'green', mid = 'gray')
+
+```
+
+
+## Vaz?o e Precipita??o | Correla??o cruzada
+```{r, echo = F}
+vazao_santa_maria %>% 
+  with(ccf(Vazao, Precipitacao, plot = F)) %>% 
+  ggfortify:::autoplot.acf() +
+  theme_bw(15) +
+  ggtitle('') +
+  ylab('Auto-correla??o parcial') +
+  xlab('Defasagem') +
+  geom_hline(yintercept = 0)
+```
+
+## Vaz?o e Precipita??o | Observa??es
+
+- Conforme a Precipita??o aumenta, tamb?m aumenta a Vaz?o.
+
+- Correla??o entre Vaz?o e Precipita??o = 0,7.
+
+- Correla??o entre Vaz?o e Precipita??o defasada em um m?s = 0,5.
+
+- Maior dispers?o da Vaz?o com rela??o ? Precipita??o defasada.
+
+- ? importante controlar Vaz?o por Precipita??o.
+
+## IOS e Vaz?o | Gr?fico de dispers?o
+
+```{r, echo = F}
+
+l <- 1
+
+vazao_santa_maria %>% 
+  ungroup() %>% 
+  mutate(Evento = lag(Evento, l)) %>% 
+  ggplot(aes(x = lag(IOS, l), y = Vazao, col = Evento)) +
+  geom_point() + 
+  theme_bw() +
+  ylab('Vaz?o (m^3/s)') +
+  xlab('IOS defasado') +
+  theme_bw() +
+  geom_vline(xintercept = 7, col = 'green') +
+  geom_vline(xintercept = -7, col = 'red') +
+  geom_smooth(method = 'lm', 
+              alpha = 0, 
+              linetype = 2, 
+              col = 'black')
+
+```
+
+##IOS e Vaz?o | Gr?fico de dispers?o entre Vaz?o e IOS defasado em um m?s
+
+```{r, echo = F}
+
+l <- 1
+
+vazao_santa_maria %>% 
+  ungroup() %>% 
+  mutate(Evento = lag(Evento, l)) %>% 
+  ggplot(aes(x = lag(IOS, l), y = Vazao, col = Evento)) +
+  geom_point() + 
+  theme_bw() +
+  ylab('Vaz?o (m^3/s)') +
+  xlab('IOS defasado') +
+  theme_bw() +
+  geom_vline(xintercept = 7, col = 'green') +
+  geom_vline(xintercept = -7, col = 'red') +
+  geom_smooth(method = 'lm', 
+              alpha = 0, 
+              linetype = 2, 
+              col = 'black')
+```
+
+## IOS e Vaz?o | Correla??o cruzada
+
+```{r, echo = F}
+
+vazao_santa_maria %>% 
+  with(ccf(Vazao, IOS, plot = F)) %>% 
+  ggfortify:::autoplot.acf() +
+  theme_bw() +
+  ggtitle('') +
+  geom_hline(yintercept = 0) +
+  xlab('Defasagem') +
+  ylab('Auto-correla??o cruzada')
+
+```
+
+## IOS e Vaz?o | Observa??es
+
+- El Ni?o $\implies$ Vaz?o com maior variabilidade.
+
+- La Ni?a $\implies$ Vaz?o menor.
+
+- Correla??o pequena.
+
+## Associa??o entre IOS e Precipita??o | Correla??o entre Precipita??o (P(t)) e IOS defasado (I(t-defasagem)) 
+
+```{r, echo = F}
+
+vazao_santa_maria %>% 
+  with(ccf(Precipitacao, IOS, plot = F)) %>% 
+  ggfortify:::autoplot.acf() +
+  theme_bw() +
+  ggtitle('') +
+  geom_hline(yintercept = 0) +
+  xlab('Defasagem') +
+  ylab('Auto-correla??o cruzada')
+
+```
+
+## Associa??o entre IOS e Precipita??o | Gr?fico de dispers?o entre IOS defasado e Precipita??o
+
+```{r, echo = F}
+
+l <- 1
+
+vazao_santa_maria %>% 
+  ungroup() %>% 
+  mutate(Evento = lag(Evento, l)) %>% 
+  ggplot(aes(x = lag(IOS, l), y = Precipitacao, col = Evento)) +
+  geom_point() + 
+  theme_bw() +
+  ylab('Precipita??o (mm)') +
+  xlab('IOS defasado') +
+  theme_bw() +
+  geom_vline(xintercept = 7, col = 'green') +
+  geom_vline(xintercept = -7, col = 'red') +
+  geom_smooth(method = 'lm', 
+              alpha = 0, 
+              linetype = 2, 
+              col = 'black')
+```
+
+## Associa??o entre IOS e Precipita??o | Gr?ficos de dispers?o entre IOS e Vaz?o 
+
+```{r, echo = F, results='hide'}
+
+l <- 1:16
+
+andar_pra_tras <- function(l, d){
+  d %>% 
+  ungroup() %>% 
+  mutate(Evento = lag(Evento, l),
+         IOS = lag(IOS, l))
+    
+}
+
+data_frame(LAGS = l) %>% 
+  group_by(LAGS) %>% 
+  do(d = andar_pra_tras(.$LAGS, vazao_santa_maria)) %>%
+  unnest(d) %>% 
+  mutate(LAGS = factor(sprintf('Lag = %s',LAGS),
+                       levels = paste('Lag =',l))) %>% 
+  ggplot(aes(x = IOS, y = Precipitacao, col = Evento)) +
+  geom_point(size = 0.7) +
+  ylab('Precipitação (mm)') +
+  xlab('IOS defasado') +
+  facet_wrap(~LAGS, ncol = sqrt(max(l))) +
+  theme_bw()
+
+```
+
+## Associa??o entre IOS e Precipita??o | Gr?ficos de dispers?o entre IOS e Vaz?o 
+
+```{r, echo = F}
+
+l <- 17:25
+
+data_frame(LAGS = l) %>% 
+  group_by(LAGS) %>% 
+  do(d = andar_pra_tras(.$LAGS, vazao_santa_maria)) %>%
+  unnest(d) %>% 
+  mutate(LAGS = factor(sprintf('Lag = %s',LAGS),
+                       levels = paste('Lag =',l))) %>% 
+  ggplot(aes(x = IOS, y = Vazao, col = Evento)) +
+  geom_point() +
+  ylab('Precipita??o (mm)') +
+  xlab('IOS defasado') +
+  facet_wrap(~LAGS, ncol = sqrt(length(l))) +
+  theme_bw()
+
+```
+
+## Associa??o entre IOS e Precipita??o | Observa??es
+
+- El Ni?o $\implies$ Precipita??o com maior variabilidade.
+
+- (La Ni?a $\implies$ Precipita??o menor) ? uma afirma??o menos evidente.
+
+### Longevidade do efeito do El Ni?o
+
+- El Ni?o $\implies$ Precipita??o menor nos anos seguintes.
+
+### Observa??o geral
+
+- Gr?ficos mais dispersos do que os de Vaz?o.
+
+##Sazonalidade 
+Precipita??o mediana mensal nos quatro primeiros pluvi?metros e quantis de ordem 10% e 90%
+
+```{r, echo = F}
+
+vazao_santa_maria %>% 
+  mutate(Mes = factor(meses[month(data)], meses)) %>% 
+  group_by(Mes) %>% 
+  summarise(
+    v_max = quantile(Vazao, 0.9, na.rm = T),
+    v_min = quantile(Vazao, 0.1, na.rm = T),
+    Vazao = mean(Vazao, na.rm = T)) %>% 
+  ggplot(aes(x = Mes, y = Vazao, ymax = v_max,
+             ymin = v_min)) +
+  geom_point() +
+  ylab('Vaz?o (m^3/s)') +
+  geom_errorbar(alpha = 0.35) +
+  theme_bw()
+
+```

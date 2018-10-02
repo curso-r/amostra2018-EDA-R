@@ -1,0 +1,406 @@
+---
+title: ""
+output: beamer_presentation
+---
+
+```{r, echo = F, warning=F, message=F}
+
+source("R/2-modelos.R")
+
+knitr::opts_chunk$set(echo = F,
+                      warning = F,
+                      message = F)
+
+options(xtable.comment = FALSE)
+
+```
+
+## Recaptulando | Introdução
+
+- O *El Niño* é um fenômeno climático caracterizado por um aquecimento acima do normal das águas do oceano pacífico equatorial.
+
+- Define-se *La Niña* de maneira análoga.
+
+## Recaptulando | IOS (Índice de Oscilação Sul)
+
+- Existem muitas maneiras de caracterizar a ocorência de *El Niño*/*La Niña*.
+
+- IOS: Índice **mensal** que mede a diferença de pressão atmosférica entre as estações de Tahiti e Darwin.
+
+- Varia entre -35 e 35.
+
+- Valores abaixo de -7 indicam a presença de *El Niño*.
+
+- Valores acima de 7 indicam a presença de *La Niña*.
+
+Fonte: Instituto de Meteorologia da Austrália
+
+## Recapitulando | Objetivo do estudo 
+
+![Bacia do Piquiri](figuras/bacia_do_piquiri.jpg)
+
+## Recapitulando | Resultados
+
+```{r, echo = F}
+
+santa_maria %>% 
+  plota_IOS_e_vazao(l = 1) +
+  xlab("IOS defasado em 1 mês")
+
+```
+
+## Recapitulando | Resultados
+
+```{r, echo = F}
+
+santa_maria %>% 
+  plota_vazao_int_eln() +
+  geom_line(color = 'black', linetype = 2) +
+  geom_point() + 
+  scale_color_hue(name = 'Intensidade do El Niño') +
+  ylab("Vazão (m³/s)")
+
+```
+
+## Recapitulando | Resultados
+
+```{r, echo = F}
+
+santa_maria %>% 
+  plota_vazao_int_lan() +
+  geom_line(color = 'black', linetype = 2) +
+  geom_point() +
+  ylab("Vazão (m³/s)")
+
+```
+
+## Recapitulando | Resultados
+
+```{r, echo = F}
+
+santa_maria %>% 
+  plota_IOS_e_precipitacao(l = 1) +
+  xlab("IOS defasado em 1 mês")
+
+```
+
+## Recapitulando | Resultados
+
+```{r, echo = F}
+
+santa_maria %>% 
+  plota_precipitacao_int_eln() +
+    geom_line(color = 'black', linetype = 2) +
+  geom_point() +
+  ylab("Precipitação (mm)")
+
+```
+
+## Recapitulando | Resultados
+
+```{r, echo = F}
+
+santa_maria %>% 
+  plota_precipitacao_int_lan() +
+  geom_line(color = 'black', linetype = 2) +
+  geom_point() +
+  ylab("Precipitação (mm)")
+
+```
+
+## Recapitulando | Resultados
+
+```{r}
+
+santa_maria %>%
+  plota_vazao_versus_precipitacao()
+
+```
+
+## Recapitulando | Resultados
+
+```{r}
+
+santa_maria %>%
+  plota_ccf_precipitacao_IOS() +
+  ggtitle("CCF de Precipitação e IOS")
+
+```
+
+## Recapitulando | Resultados
+
+```{r}
+
+santa_maria %>%
+  plota_ccf_vazao_IOS() +
+  ggtitle("CCF de Vazão e IOS")
+
+```
+
+## Estratégia de análise
+
+### Principais problemas a serem tratados
+
+- Vazão e Precipitação são dependentes.
+- Variabilidade não parece constante para diferentes níveis de IOS.
+
+## Estratégia de análise| Solução
+
+1. Modelo que busque efeito de IOS em precipitação $$ IOS, MES \implies P $$
+
+2. Modelo que busque efeito de Precipitação e IOS em Vazão $$ IOS, MES, P \implies V $$
+
+3. Checar se IOS pode ser retirado de 2.
+
+## Modelo para precipitação 
+
+Vamos começar com uma regressão linear simples, um modelo ingênuo.
+
+$$ P_t = MES_t + \beta IOS_{t-1} + \epsilon_t$$
+
+$$ \epsilon_t \sim N(0,\sigma^2) \ i. i. d.$$
+
+## Modelo para precipitação | Diagnóstico ingênuo
+
+```{r}
+
+diagnostico(lm_pre)
+
+```
+
+## Modelo para precipitação | Arrumando o modelo
+
+- Violação de normalidade.
+- Variabilidade inconstante.
+
+Vamos procurar variações do resíduo em função das covariáveis
+
+$$ e_t = (\hat{Y_t}-Y_t)^2 = MES_t + \gamma IOS_{t-1} + \epsilon_t$$
+
+$$ \epsilon_t \sim N(0,\sigma_2^2) \ i. i. d.$$
+
+## Modelo para precipitação | Arrumando o modelo
+
+```{r, results = 'asis'}
+lm_pre_bp %>% 
+  xtable(auto = F)
+```
+
+## Modelo para precipitação | Arrumando o modelo
+
+- A hipótese de que todos os coeficientes são nulos é rejeitada com valor-p de 0,004.
+- Evidencia de heterocedasticidade.
+- Um modelo heterocedástico pode resolver o problema da anormalidade dos resíduos.
+- IOS não foi significativo na variância.
+
+## Modelo para precipitação | Novo modelo
+
+$$ P_t = MES_t + \beta IOS_{t-1} + \epsilon_t$$
+
+$$ \epsilon_t \sim N(0,\sigma_t^2) \ i. i. d.$$
+
+$$ \sigma_t^2 \propto MES_t$$
+
+## Modelo para precipitação | Diagnóstico
+
+```{r}
+
+gg_qq(resid(gls_pre))
+
+```
+
+## Modelo para precipitação | Diagnóstico
+
+- O mesmo problema se mantém.
+- Além de terem médias e variâncias distintas, as distribuições de probabilidades da variável Precipitação são assimétricas.
+
+## Modelo para precipitação | Diagnóstico
+
+```{r}
+
+santa_maria %>% 
+  ggplot(aes(x = Pre, colour = Mes)) +
+  geom_density() +
+  facet_wrap(~Mes) +
+  padroes_esteticos +
+  xlab("Precipitação (mm)") +
+  theme(legend.position = 'none')
+
+```
+
+## Modelo para precipitação | Diagnóstico
+
+```{r}
+
+santa_maria %>% 
+  ggplot(aes(x = sqrt(Pre), colour = Mes)) +
+  geom_density() +
+  facet_wrap(~Mes) +
+  padroes_esteticos +
+  xlab("Raiz quadrada da Precipitação (mm)") +
+  theme(legend.position = 'none')
+
+```
+
+## Modelo para precipitação | Modelo final
+
+- A solução final consistirá em utilizar um modelo heterocedástico para raiz quadrada da Precipitação.
+
+$$ \sqrt{P_t} = MES_t + \beta IOS_{t-1} + \epsilon_t $$
+
+$$ \epsilon_t \sim N(0, \sigma^2_t) \text{ qualquer}, \ \text{mas} \ i. i. d.$$
+
+$$ \sigma_t^2 \propto MES_t$$
+
+## Modelo para precipitação | Modelo final
+
+```{r}
+
+# gls_pre_2 %>% 
+#   summary() %>% 
+#   xtable()
+
+```
+
+\centering
+\begin{tabular}{rrrrr}
+  \hline
+ & Estimate & Std. Error & t value & Pr($>$$|$t$|$) \\ 
+  \hline
+(Intercept) & 13.3169 & 0.5310 & 25.07 & <0.0001 \\ 
+  l\_IOS & -0.0542 & 0.0133 & -3.91 & 0.0001 \\ 
+  MesFev & -0.9530 & 0.7385 & -1.29 & 0.1976 \\ 
+  MesMar & -2.1479 & 0.6282 & -3.41 & 0.0007 \\ 
+  MesAbr & -2.3007 & 0.7660 & -3.02 & 0.0026 \\ 
+  MesMai & -1.1705 & 0.8977 & -1.30 & 0.1930 \\ 
+  MesJun & -3.0636 & 0.8339 & -3.67 & 0.0003 \\ 
+  MesJul & -3.9101 & 0.7592 & -5.14 & <0.0001 \\ 
+  MesAgo & -5.0990 & 0.8446 & -6.03 & <0.0001 \\ 
+  MesSet & -1.7709 & 0.8159 & -2.17 & 0.0306 \\ 
+  MesOut & 0.3684 & 0.7521 & 0.46 & 0.6245 \\ 
+  MesNov & -0.8615 & 0.6876 & -1.25 & 0.2110 \\ 
+  MesDez & 0.1055 & 0.7414 & 0.14 & 0.8869 \\ 
+   \hline
+\end{tabular}
+
+## Modelo para precipitação | Conclusões
+
+- O IOS tem efeito na média da raiz quadrada da Precipitação do mês seguinte.
+- Existe um padrão sazonal.
+- Existem diferenças entre as distribuições de precipitação ao longo dos meses.
+
+## Modelo para Vazão 
+
+Vamos começar o modelo de vazão ingenuamente
+
+$$ V_t = \alpha_1 P_t + \alpha_2 P_{t-1} + \alpha_3 P_{t-2} +  MES_t + \beta IOS_{t-1} + \epsilon_t $$
+
+$$ \epsilon_t \sim N(0,\sigma^2) \ i. i. d.$$
+
+## Modelo para Vazão | Diagnóstico
+
+```{r}
+
+diagnostico(fit_lm_y)
+
+```
+
+## Modelo para Vazão
+
+- Precipitações muito próximas de 0 produzem vazões previsões de vazão muito pequenas.
+
+- O log ajuda a resolver distorções.
+
+$$ log(V_t) = \alpha_1 P_t + \alpha_2 P_{t-1} + \alpha_3 P_{t-2} + MES_t + \beta IOS_{t-1} + \epsilon_t$$
+
+$$ \epsilon_t \sim N(0,\sigma^2) \ i. i. d.$$
+
+## Modelo para Vazão | Diagnóstico
+
+```{r}
+
+diagnostico(fit_lm_ly)
+
+```
+
+## Modelo para Vazão
+
+- O log ajudou a resolver o problema das estimativas negativas, mas deixou os resíduos correlacionados.
+
+$$ log(V_t) = \alpha_1 P_t + \alpha_2 P_{t-1} + \alpha_3 P_{t-2} + MES_t + \beta IOS_{t-1} + \epsilon_t$$
+
+$$ \epsilon_t \sim AR(1) $$
+
+$$ \epsilon_t = \gamma\epsilon_{t-1} + \nu_t$$
+
+$$\nu_t \sim N(0,\sigma^2) \ i. i. d. $$
+
+## Modelo para Vazão | Diagnóstico
+
+```{r}
+
+diagnostico(fit_ar1)
+
+```
+
+## Modelo para Vazão | Diagnóstico
+
+```{r}
+
+fitado <- exp(fitted(fit_ar1))
+
+  obs <- exp(log(fitado) + resid(fit_ar1))
+  
+datas <- santa_maria$data[-c(1:2)]
+
+  d <- data_frame(`Ajustado` = fitado, `Observado` = obs,
+                  Data = datas,
+                  int_lan = santa_maria$int_lan[-c(1:2)],
+                  int_eln = santa_maria$int_eln[-c(1:2)]) %>% 
+    gather(Tipo, Valor, -Data, -int_lan, -int_eln) %>% 
+    mutate(decenio = cut(year(Data), 4, labels = F),
+           Tipo = factor(Tipo, levels = c('Observado','Ajustado')))
+    
+d %>% 
+    ggplot(aes(y = Valor, x = Data, linetype = Tipo, color = Tipo)) +
+    facet_wrap(~decenio, ncol = 2, scales = 'free_x') + 
+    geom_line() +
+    padroes_esteticos +
+    theme(strip.background = element_blank(),
+          strip.text.x = element_blank(),
+          legend.position = 'bottom') +
+  ylab("Vazão (m³/s)") +
+  xlab("Data")
+  
+
+```
+
+## Modelo para Vazão | Diagnóstico
+
+```{r}
+
+d %>% 
+    ggplot(aes(y = Valor, x = Data, linetype = Tipo)) +
+    facet_wrap(~decenio, ncol = 2, scales = 'free_x') + 
+    geom_line() +
+    geom_point(aes(color = int_eln)) + 
+    padroes_esteticos +
+    theme(strip.background = element_blank(),
+          strip.text.x = element_blank(),
+          legend.position = 'bottom') +
+  ylab("Vazão (m³/s)") +
+  xlab("Data")
+
+```
+
+## Modelo para Vazão | Conclusões
+
+- IOS é significativo no modelo com valor p = 0,04.
+- O aumento de uma unidade do IOS diminui a vazão em 0,02%.
+- Maior variabilidade acontece nos meses de *El Niño*, mas sem evidências de heterocedasticidade (valor p do teste = 0,40).
+
+## Conclusão
+
+- A influência do IOS na precipitação é significativa tanto na média quanto na variância, significando que valores extremos de precipitação ocorrem com maior frequência nos meses posterioes a IOS's grandes.
+
+- A influência do IOS na Vazão acontece tanto através da Precipitação quanto independentemente dela. 
